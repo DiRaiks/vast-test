@@ -83,6 +83,7 @@
 <div id="container">
     <div id="videoplayer">
         <video id="content">
+            <source src="https://vokrugsveta.tv/video/player/?id=901625&poster=https%3A%2F%2Fbl.webcaster.pro%2Fevents%2F901625%2Fmain_thumbnail%2Fbig.jpg"></source>
         </video>
         <div id="adcontainer">
         </div>
@@ -90,8 +91,9 @@
     </div>
 
     <center>
-        <input id="requestXMLInput" style="width:600px; height:30px;">
         <div id="vpaidError">ERROR, please reload page</div>
+        <input id="requestXMLInput" style="width:600px; height:30px;">
+        <textarea id="requestXMLTextArea" style="width:600px; height:150px;">&lt;VAST/&gt;</textarea>
     </center>
 </div>
 <script type="text/javascript">
@@ -105,7 +107,10 @@
      * Handles user interaction and creates the player and ads controllers.
      */
     var Application = function() {
-        this.xmlBox_ = document.getElementById('requestXMLInput');
+        this.xmlBox_ = {
+            url: document.getElementById('requestXMLInput'),
+            xml: document.getElementById('requestXMLTextArea'),
+        };
 
         this.playButton_ = document.getElementById('playpause');
         this.playButton_.addEventListener(
@@ -192,11 +197,11 @@
     Application.prototype.onClick_ = function() {
         if (!this.adsDone_) {
             this.log('Click event.');
-            if (this.xmlBox_.value == '') {
+            if (this.xmlBox_.url.value == '' && this.xmlBox_.xml.value == '') {
                 this.log("Error: please fill in xml");
                 return;
             } else {
-                this.adXml_ = this.xmlBox_.value;
+                this.adXml_ = this.xmlBox_;
             }
             // The user clicked/tapped - inform the ads controller that this code
             // is being run in a user action thread.
@@ -347,7 +352,14 @@
             return;
         }
         var adsRequest = new google.ima.AdsRequest();
-        adsRequest.adTagUrl = adXML;  // No url, using xml instead
+        console.log(adXML)
+        if (adXML.url.value !== '') {
+            adsRequest.adTagUrl = adXML.url.value;  // No url, using xml instead
+        } else if (adXML.xml.value !== '') {
+            adsRequest.adTagUrl = '';  // No url, using xml instead
+            adsRequest.adsResponse = adXML.xml.value;
+        }
+        // adsRequest.adTagUrl = adXML;  // No url, using xml instead
         adsRequest.linearAdSlotWidth = this.videoPlayer_.width;
         adsRequest.linearAdSlotHeight = this.videoPlayer_.height;
         adsRequest.nonLinearAdSlotWidth = this.videoPlayer_.width;
