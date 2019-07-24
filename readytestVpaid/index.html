@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="../style.css"/>
+
+    <script type="text/javascript" src="//s0.2mdn.net/instream/html5/ima3.js"></script>
+</head>
+<body>
+<div id="container">
+    <div id="videoplayer">
+        <video id="content">
+        </video>
+        <div id="adcontainer">
+        </div>
+        <button id="playpause">&#9654;</button>
+    </div>
+
+    <center>
+        <textarea id="requestXMLInput" style="width:600px; height:200px;">&lt;VAST/&gt;</textarea>
+    </center>
+</div>
+<script type="text/javascript">
+    var application = null;
+
+    window.onload = function() {
+        application = new Application();
+    };
+
+    /**
+     * Handles user interaction and creates the player and ads controllers.
+     */
+    var Application = function() {
+        this.xmlBox_ = document.getElementById('requestXMLInput');
+
+        this.playButton_ = document.getElementById('playpause');
+        this.playButton_.addEventListener(
+            'click',
+            this.bind_(this, this.onClick_),
+            false);
+
+        this.playing_ = false;
+        this.adsActive_ = false;
+        this.adsDone_ = false;
+
+        this.videoPlayer_ = new VideoPlayer();
+        this.ads_ = new Ads(this, this.videoPlayer_);
+        this.adXml_ = '';
+
+        this.videoPlayer_.registerVideoEndedCallback(
+            this.bind_(this, this.onContentEnded_));
+        this.httpRequest_ = null;
+    };
+
+    Application.prototype.log = function(message) {
+        console.log(message);
+    };
+
+    Application.prototype.resumeAfterAd = function() {
+        this.videoPlayer_.play();
+        this.adsActive_ = false;
+        this.updateChrome_();
+    };
+
+    Application.prototype.pauseForAd = function() {
+        this.adsActive_ = true;
+        this.playing_ = true;
+        this.videoPlayer_.pause();
+        this.updateChrome_();
+    };
+
+    Application.prototype.adClicked = function() {
+        this.updateChrome_();
+    };
+
+    Application.prototype.bind_ = function(thisObj, fn) {
+        return function() {
+            fn.apply(thisObj, arguments);
+        };
+    };
+
+    Application.prototype.requestVideoSample_ = function() {
+        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/VpaidVideoPlayerSample.xml');
+    };
+
+    Application.prototype.requestNonLinearSample_ = function() {
+        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/NonLinearSample.xml');
+    };
+
+    Application.prototype.requestSample_ = function() {
+        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/TesterSample.xml');
+    };
+
+    Application.prototype.requestGameSample_ = function() {
+        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/GameSample.xml');
+    };
+
+    Application.prototype.makeRequest_ = function(url) {
+        if (window.XMLHttpRequest) {
+            this.httpRequest_ = new XMLHttpRequest();
+        } else if (window.ActiveXObject) {
+            try {
+                this.httpRequest_ = new ActiveXObject("Msxml2.XMLHTTP");
+            }
+            catch (e) {
+                this.httpRequest_ = new ActiveXObject("Microsoft.XMLHTTP");
+            }
+        }
+        this.httpRequest_.onreadystatechange = this.bind_(this, this.setXml_);
+        this.httpRequest_.open('GET', url);
+        this.httpRequest_.send();
+    };
+
+    Application.prototype.setXml_ = function() {
+        this.xmlBox_.value = this.httpRequest_.responseText;
+    };
+
+    Application.prototype.onClick_ = function() {
+        if (!this.adsDone_) {
+            this.log('Click event.');
+            if (this.xmlBox_.value == '') {
+                this.log("Error: please fill in xml");
+                return;
+            } else {
+                this.adXml_ = this.xmlBox_.value;
+            }
+            // The user clicked/tapped - inform the ads controller that this code
+            // is being run in a user action thread.
+            this.ads_.initialUserAction();
+            // At the same time, initialize the content player as well.
+            // When content is loaded, we'll issue the ad request to prevent it
+            // from interfering with the initialization. See
+            // https://developers.google.com/interactive-media-ads/docs/sdks/html5/v3/ads#iosvideo
+            // for more information.
+            this.videoPlayer_.preloadContent(this.bind_(this, this.loadAds_));
+            this.adsDone_ = true;
+            return;
+        }
+
+        if (this.adsActive_) {
+            if (this.playing_) {
+                this.ads_.pause();
+            } else {
+                this.ads_.resume();
+            }
+        } else {
+            if (this.playing_) {
+                this.videoPlayer_.pause();
+            } else {
+                this.videoPlayer_.play();
+            }
+        }
+
+        this.playing_ = !this.playing_;
+
+        this.updateChrome_();
+    };
+
+    Application.prototype.updateChrome_ = function() {
+        if (this.playing_) {
+            this.playButton_.textContent = 'II';
+        } else {
+            // Unicode play symbol.
+            this.playButton_.textContent = String.fromCharCode(9654);
+        }
+    };
+
+    Application.prototype.loadAds_ = function() {
+        this.ads_.requestXml(this.adXml_);
+    };
+
+    Application.prototype.onContentEnded_ = function() {
+        this.ads_.contentEnded();
+    };
+
+    /**
+     * Handles video player functionality.
+     */
+    var VideoPlayer = function() {
+        this.contentPlayer = document.getElementById('content');
+        this.adContainer = document.getElementById('adcontainer');
+        this.videoPlayerContainer_ = document.getElementById('videoplayer');
+
+        this.width = 640;
+        this.height = 360;
+    };
+
+    VideoPlayer.prototype.preloadContent = function(contentLoadedAction) {
+        // If this is the initial user action on iOS or Android device,
+        // simulate playback to enable the video element for later program-triggered
+        // playback.
+        if (this.isMobilePlatform()) {
+            this.contentPlayer.addEventListener(
+                'loadedmetadata',
+                contentLoadedAction,
+                false);
+            this.contentPlayer.load();
+        } else {
+            contentLoadedAction();
+        }
+    };
+
+    VideoPlayer.prototype.play = function() {
+        this.contentPlayer.play();
+    };
+
+    VideoPlayer.prototype.pause = function() {
+        this.contentPlayer.pause();
+    };
+
+    VideoPlayer.prototype.isMobilePlatform = function() {
+        return this.contentPlayer.paused &&
+            (navigator.userAgent.match(/(iPod|iPhone|iPad)/) ||
+                navigator.userAgent.toLowerCase().indexOf('android') > -1);
+    };
+
+    VideoPlayer.prototype.resize = function(
+        position, top, left, width, height) {
+        this.videoPlayerContainer_.style.position = position;
+        this.videoPlayerContainer_.style.top = top + 'px';
+        this.videoPlayerContainer_.style.left = left + 'px';
+        this.videoPlayerContainer_.style.width = width + 'px';
+        this.videoPlayerContainer_.style.height = height + 'px';
+        this.contentPlayer.style.width = width + 'px';
+        this.contentPlayer.style.height = height + 'px';
+    };
+
+    VideoPlayer.prototype.registerVideoEndedCallback = function(callback) {
+        this.contentPlayer.addEventListener(
+            'ended',
+            callback,
+            false);
+    };
+
+    /**
+     * Shows how to use the IMA SDK to request and display ads.
+     */
+    var Ads = function (application, videoPlayer) {
+        this.application_ = application;
+        this.videoPlayer_ = videoPlayer;
+        this.contentCompleteCalled_ = false;
+        this.adDisplayContainer_ =
+            new google.ima.AdDisplayContainer(this.videoPlayer_.adContainer, this.videoPlayer_.contentPlayer);
+        this.adsLoader_ = new google.ima.AdsLoader(this.adDisplayContainer_);
+        var mode = google.ima.ImaSdkSettings.VpaidMode.INSECURE;
+        this.adsLoader_.getSettings().setVpaidMode(mode);
+        this.adsManager_ = null;
+
+        this.adsLoader_.addEventListener(
+            google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
+            this.onAdsManagerLoaded_,
+            false,
+            this);
+        this.adsLoader_.addEventListener(
+            google.ima.AdErrorEvent.Type.AD_ERROR,
+            this.onAdError_,
+            false,
+            this);
+    };
+
+    // On iOS and Android devices, video playback must begin in a user action.
+    // AdDisplayContainer provides a initialize() API to be called at appropriate
+    // time.
+    // This should be called when the user clicks or taps.
+    Ads.prototype.initialUserAction = function () {
+        this.adDisplayContainer_.initialize();
+    };
+
+    Ads.prototype.requestXml = function (adXML) {
+        // Mobile calls requestXml when video source changes.
+        // The VPAID ad will change the video source.
+        if (this.adsManager_ != null) {
+            return;
+        }
+        var adsRequest = new google.ima.AdsRequest();
+        adsRequest.adTagUrl = '';  // No url, using xml instead
+        adsRequest.adsResponse = adXML;
+        adsRequest.linearAdSlotWidth = this.videoPlayer_.width;
+        adsRequest.linearAdSlotHeight = this.videoPlayer_.height;
+        adsRequest.nonLinearAdSlotWidth = this.videoPlayer_.width;
+        adsRequest.nonLinearAdSlotHeight = this.videoPlayer_.height;
+        this.adsLoader_.requestAds(adsRequest);
+    };
+
+    Ads.prototype.pause = function () {
+        if (this.adsManager_) {
+            this.adsManager_.pause();
+        }
+    };
+
+    Ads.prototype.resume = function () {
+        if (this.adsManager_) {
+            this.adsManager_.resume();
+        }
+    };
+
+    Ads.prototype.resize = function (width, height) {
+        if (this.adsManager_) {
+            this.adsManager_.resize(width, height, google.ima.ViewMode.FULLSCREEN);
+        }
+    };
+
+    Ads.prototype.contentEnded = function () {
+        this.contentCompleteCalled_ = true;
+        this.adsLoader_.contentComplete();
+    };
+
+    Ads.prototype.onAdsManagerLoaded_ = function (adsManagerLoadedEvent) {
+        this.application_.log('Ads loaded.');
+        this.adsManager_ = adsManagerLoadedEvent.getAdsManager(
+            this.videoPlayer_.contentPlayer);
+        this.processAdsManager_(this.adsManager_);
+    };
+
+    Ads.prototype.processAdsManager_ = function (adsManager) {
+        // Attach the pause/resume events.
+        adsManager.addEventListener(
+            google.ima.AdEvent.Type.CONTENT_PAUSE_REQUESTED,
+            this.onContentPauseRequested_,
+            false,
+            this);
+        adsManager.addEventListener(
+            google.ima.AdEvent.Type.CONTENT_RESUME_REQUESTED,
+            this.onContentResumeRequested_,
+            false,
+            this);
+        // Handle errors.
+        adsManager.addEventListener(
+            google.ima.AdErrorEvent.Type.AD_ERROR,
+            this.onAdError_,
+            false,
+            this);
+        var events = [google.ima.AdEvent.Type.ALL_ADS_COMPLETED,
+            google.ima.AdEvent.Type.CLICK,
+            google.ima.AdEvent.Type.COMPLETE,
+            google.ima.AdEvent.Type.FIRST_QUARTILE,
+            google.ima.AdEvent.Type.LOADED,
+            google.ima.AdEvent.Type.MIDPOINT,
+            google.ima.AdEvent.Type.PAUSED,
+            google.ima.AdEvent.Type.STARTED,
+            google.ima.AdEvent.Type.THIRD_QUARTILE];
+        for (var index in events) {
+            adsManager.addEventListener(
+                events[index],
+                this.onAdEvent_,
+                false,
+                this);
+        }
+
+        var initWidth, initHeight;
+        if (this.application_.fullscreen) {
+            initWidth = this.application_.fullscreenWidth;
+            initHeight = this.application_.fullscreenHeight;
+        } else {
+            initWidth = this.videoPlayer_.width;
+            initHeight = this.videoPlayer_.height;
+        }
+        adsManager.init(
+            initWidth,
+            initHeight,
+            google.ima.ViewMode.NORMAL);
+
+        adsManager.start();
+    };
+
+    Ads.prototype.onContentPauseRequested_ = function (adErrorEvent) {
+        this.application_.pauseForAd();
+    };
+
+    Ads.prototype.onContentResumeRequested_ = function (adErrorEvent) {
+        // Without this check the video starts over from the beginning on a
+        // post-roll's CONTENT_RESUME_REQUESTED
+        if (!this.contentCompleteCalled_) {
+            this.application_.resumeAfterAd();
+        }
+    };
+
+    Ads.prototype.onAdEvent_ = function (adEvent) {
+        this.application_.log('Ad event: ' + adEvent.type);
+
+        if (adEvent.type == google.ima.AdEvent.Type.CLICK) {
+            this.application_.adClicked();
+        }
+    };
+
+    Ads.prototype.onAdError_ = function (adErrorEvent) {
+        this.application_.log('Ad error: ' + adErrorEvent.getError().toString());
+        if (this.adsManager_) {
+            this.adsManager_.destroy();
+        }
+        this.application_.resumeAfterAd();
+    };
+
+
+</script>
+</body>
+</html>
