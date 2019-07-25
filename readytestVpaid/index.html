@@ -128,7 +128,6 @@
 
         this.videoPlayer_.registerVideoEndedCallback(
             this.bind_(this, this.onContentEnded_));
-        this.httpRequest_ = null;
     };
 
     Application.prototype.log = function(message) {
@@ -156,42 +155,6 @@
         return function() {
             fn.apply(thisObj, arguments);
         };
-    };
-
-    Application.prototype.requestVideoSample_ = function() {
-        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/VpaidVideoPlayerSample.xml');
-    };
-
-    Application.prototype.requestNonLinearSample_ = function() {
-        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/NonLinearSample.xml');
-    };
-
-    Application.prototype.requestSample_ = function() {
-        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/TesterSample.xml');
-    };
-
-    Application.prototype.requestGameSample_ = function() {
-        this.makeRequest_('http://ryanthompson591.github.io/vpaidExamples/xmlExamples/GameSample.xml');
-    };
-
-    Application.prototype.makeRequest_ = function(url) {
-        if (window.XMLHttpRequest) {
-            this.httpRequest_ = new XMLHttpRequest();
-        } else if (window.ActiveXObject) {
-            try {
-                this.httpRequest_ = new ActiveXObject("Msxml2.XMLHTTP");
-            }
-            catch (e) {
-                this.httpRequest_ = new ActiveXObject("Microsoft.XMLHTTP");
-            }
-        }
-        this.httpRequest_.onreadystatechange = this.bind_(this, this.setXml_);
-        this.httpRequest_.open('GET', url);
-        this.httpRequest_.send();
-    };
-
-    Application.prototype.setXml_ = function() {
-        this.xmlBox_.value = this.httpRequest_.responseText;
     };
 
     Application.prototype.onClick_ = function() {
