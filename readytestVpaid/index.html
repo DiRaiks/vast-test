@@ -75,6 +75,15 @@
             color: red;
             font-size: 18px;
         }
+
+        #wrapper {
+            width: 600px;
+            margin-top: 20px;
+        }
+
+        #requestXMLInput, #requestXMLTextArea {
+            border: 1px solid black;
+        }
     </style>
 
         <script type="text/javascript" src="//s0.2mdn.net/instream/html5/ima3.js"></script>
@@ -92,8 +101,13 @@
 
     <center>
         <div id="vpaidError">ERROR, please reload page</div>
-        <input id="requestXMLInput" style="width:600px; height:30px;">
-        <textarea id="requestXMLTextArea" style="width:600px; height:150px;">&lt;VAST/&gt;</textarea>
+        <div id="wrapper">
+            <label for="requestXMLInput">URL </label><input id="requestXMLInput" style="width: 90%; height:30px;">
+            <textarea id="requestXMLTextArea" style="width: 100%; height:150px; margin-top: 10px;">&lt;VAST/&gt;</textarea>
+        </div>
+        <div>
+
+        </div>
     </center>
 </div>
 <script type="text/javascript">
